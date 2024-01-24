@@ -1,36 +1,34 @@
-const path = '03-files-in-folder/secret-folder';
-const fs = require('fs');
+const path = require('path');
+const fs = require('fs').promises;
 
-fs.promises
-  .readdir(path, { withFileTypes: true })
+const directoryPath = path.join(__dirname, 'secret-folder');
 
-  .then((filenames) => {
-    for (let filename of filenames) {
-      if (filename[Reflect.ownKeys(filename)[1]] == 2) {
-        delete this.filename;
-      } else {
-        fs.stat(
-          `03-files-in-folder/secret-folder/${filename.name}`,
-          (err, stats) => {
-            if (err) {
-              console.error(err);
-              return;
-            }
-            stats.size;
-            console.log(
-              filename.name.split('.')[0] +
-                ' - ' +
-                filename.name.split('.')[1] +
-                ' - ' +
-                Math.round(stats.size / 1024) +
-                'kb',
-            );
-          },
-        );
+async function printFileDetails() {
+  try {
+    const files = await fs.readdir(directoryPath, { withFileTypes: true });
+
+    for (const file of files) {
+      if (file.isDirectory()) {
+        continue;
       }
-    }
-  })
 
-  .catch((err) => {
-    console.log(err);
-  });
+      const filePath = path.join(directoryPath, file.name);
+      const stats = await fs.stat(filePath);
+
+      const fileSizeInKB = (stats.size / 1024).toFixed(2);
+      const extension = path.extname(file.name).substring(1);
+      const filenameWithoutExtension = path.basename(
+        file.name,
+        path.extname(file.name),
+      );
+
+      console.log(
+        `${filenameWithoutExtension} - ${extension} - ${fileSizeInKB}kb`,
+      );
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+printFileDetails();
