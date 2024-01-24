@@ -2,12 +2,12 @@ const process = require('process');
 let stdin = process.openStdin();
 const fs = require('fs');
 const stdout = process.stdout;
-stdout.write('Как день провёл?\n');
+stdout.write('Как прошли выходные?\n');
 
 let qwerty = '';
 
 function exitFile() {
-  stdout.write('\nУдачи во всём!\n!');
+  stdout.write('\nСчастливо!\n!');
   process.exit();
 }
 

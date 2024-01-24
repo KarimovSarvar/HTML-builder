@@ -1,142 +1,69 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
+
 const stylePath = path.join(__dirname, 'styles');
 const bundlePath = path.join(__dirname, 'project-dist/style.css');
-const output = fs.createWriteStream(bundlePath);
 const assets = path.join(__dirname, 'assets');
 const assetsCopy = path.join(__dirname, 'project-dist', 'assets');
 
-fs.mkdir('06-build-page/project-dist', { recursive: true }, (error) => {
-  if (error) throw error;
-});
+async function createProjectDist() {
+  try {
+    await fs.mkdir('06-build-page/project-dist', { recursive: true });
 
-fs.writeFile('06-build-page/project-dist/index.html', '', 'utf-8', (error) => {
-  if (error) throw error;
-});
+    await fs.copyFile(
+      '06-build-page/template.html',
+      '06-build-page/project-dist/index.html',
+    );
+    let data = await fs.readFile(
+      '06-build-page/project-dist/index.html',
+      'utf-8',
+    );
 
-fs.copyFile(
-  '06-build-page/template.html',
-  '06-build-page/project-dist/index.html',
-  (error) => {
-    if (error) throw error;
-  },
-);
+    const files = await fs.readdir('06-build-page/components', {
+      withFileTypes: true,
+    });
+    for (const elem of files) {
+      const dataHtml = await fs.readFile(
+        `06-build-page/components/${elem.name}`,
+        'utf-8',
+      );
+      data = data.replace(`{{${elem.name.split('.')[0]}}}`, dataHtml);
+    }
+    await fs.writeFile('06-build-page/project-dist/index.html', data, 'utf-8');
 
-fs.readFile('06-build-page/project-dist/index.html', 'utf-8', (err, data) => {
-  if (err) throw err;
-  fs.readdir(
-    '06-build-page/components',
-    { withFileTypes: true },
-    (err, files) => {
-      if (err) throw err;
-      files.forEach((elem) => {
-        fs.readFile(
-          '06-build-page/components/' + `${elem.name}`,
-          'utf-8',
-          (err, dataHtml) => {
-            if (err) throw err;
-            data = data.replace(
-              '{{' + `${elem.name.split('.')[0]}` + '}}',
-              dataHtml,
-            );
-            fs.writeFile(
-              '06-build-page/project-dist/index.html',
-              data,
-              'utf-8',
-              (err) => {
-                if (err) throw err;
-              },
-            );
-          },
-        );
-      });
-    },
-  );
-});
-
-fs.promises
-  .readdir(stylePath)
-
-  .then((files) => {
-    for (let file of files) {
-      const filePath = path.join(stylePath, file);
-      const fileName = path.basename(filePath);
-
-      if (fileName.split('.')[1] === 'css') {
-        const input = fs.createReadStream(
-          path.join(stylePath, fileName),
-          'utf-8',
-        );
-
-        input.on('data', (data) => output.write(data.toString() + '\n'));
+    const cssFiles = await fs.readdir(stylePath);
+    let cssContent = '';
+    for (const file of cssFiles) {
+      if (file.endsWith('.css')) {
+        const cssData = await fs.readFile(path.join(stylePath, file), 'utf-8');
+        cssContent += `${cssData}\n`;
       }
     }
-  });
+    await fs.writeFile(bundlePath, cssContent);
 
-fs.mkdir(assetsCopy, { recursive: true }, (err) => {
-  if (err) throw err;
-});
+    await copyAssets(assets, assetsCopy);
+  } catch (error) {
+    console.error(error);
+  }
+}
 
-fs.readdir(assets, { withFileTypes: true }, (err, directory) => {
-  if (err) throw err;
-  const copiedDir = directory.filter((dir) => dir.isDirectory());
-  copiedDir.forEach((folder) => {
-    fs.mkdir(
-      path.join(__dirname, 'project-dist', 'assets', `${folder.name}`),
-      { recursive: true },
-      (err) => {
-        if (err) throw err;
-      },
-    );
+async function copyAssets(src, dest) {
+  await fs.mkdir(dest, { recursive: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
 
-    fs.readdir(
-      path.join(__dirname, 'assets', `${folder.name}`),
-      { withFileTypes: true },
-      (err, files) => {
-        if (err) throw err;
-        files.forEach((file) => {
-          setTimeout(() => {
-            fs.copyFile(
-              path.join(__dirname, 'assets', `${folder.name}`, `${file.name}`),
-              path.join(
-                __dirname,
-                'project-dist',
-                'assets',
-                `${folder.name}`,
-                `${file.name}`,
-              ),
-              (err) => {
-                if (err) throw err;
-              },
-            );
-          }, 1000);
-        });
-      },
-    );
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
 
-    fs.readdir(
-      path.join(__dirname, 'project-dist', 'assets', `${folder.name}`),
-      { withFileTypes: true },
-      (err, copyFiles) => {
-        if (err) throw err;
-        copyFiles.forEach((file) => {
-          fs.unlink(
-            path.join(
-              __dirname,
-              'project-dist',
-              'assets',
-              `${folder.name}`,
-              `${file.name}`,
-            ),
-            (err) => {
-              if (err) throw err;
-            },
-          );
-        });
-      },
-    );
-  });
-});
+    if (entry.isDirectory()) {
+      await copyAssets(srcPath, destPath);
+    } else {
+      await fs.copyFile(srcPath, destPath);
+    }
+  }
+}
+
+createProjectDist();
 
 /* Импорт всех требуемых модулей
 Прочтение и сохранение в переменной файла-шаблона
